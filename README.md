@@ -34,6 +34,8 @@ This runs a live paper loop using yfinance prices and your risk settings.
 - `STOP_LOSS_PCT` (e.g. 0.01 = 1% stop)
 - `TAKE_PROFIT_PCT` (e.g. 0.02 = 2% target)
 - `MAX_POSITION_NOTIONAL_PCT` (cap exposure, 1.0 = 100% equity)
+- `COMMISSION_BPS` (transaction fee in bps, e.g. 1.0 = 0.01%)
+- `SLIPPAGE_BPS` (fill slippage in bps, e.g. 2.0 = 0.02%)
 
 ## Reporting output
 Run with `--save-report` to generate files under `reports/backtest-<timestamp>/`:

@@ -21,6 +21,8 @@ class Settings:
     max_position_notional_pct: float
     paper_poll_seconds: int
     paper_max_loops: int
+    commission_bps: float
+    slippage_bps: float
 
     @staticmethod
     def from_env() -> "Settings":
@@ -38,4 +40,6 @@ class Settings:
             max_position_notional_pct=float(os.getenv("MAX_POSITION_NOTIONAL_PCT", "1.0")),
             paper_poll_seconds=int(os.getenv("PAPER_POLL_SECONDS", "60")),
             paper_max_loops=int(os.getenv("PAPER_MAX_LOOPS", "30")),
+            commission_bps=float(os.getenv("COMMISSION_BPS", "0")),
+            slippage_bps=float(os.getenv("SLIPPAGE_BPS", "0")),
         )

@@ -45,6 +45,8 @@ def main() -> None:
             initial_balance=settings.initial_balance,
             risk_manager=risk_manager,
             return_details=True,
+            commission_bps=settings.commission_bps,
+            slippage_bps=settings.slippage_bps,
         )
 
         print("=== Backtest Report ===")
@@ -64,6 +66,8 @@ def main() -> None:
             strategy=strategy,
             risk_manager=risk_manager,
             initial_balance=settings.initial_balance,
+            commission_bps=settings.commission_bps,
+            slippage_bps=settings.slippage_bps,
         )
 
 

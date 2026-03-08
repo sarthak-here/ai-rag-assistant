@@ -9,9 +9,14 @@ def run_backtest(
     initial_balance: float = 10000,
     risk_manager: RiskManager | None = None,
     return_details: bool = False,
+    commission_bps: float = 0.0,
+    slippage_bps: float = 0.0,
 ):
     if risk_manager is None:
         risk_manager = RiskManager()
+
+    commission_rate = max(0.0, float(commission_bps)) / 10_000
+    slippage_rate = max(0.0, float(slippage_bps)) / 10_000
 
     signals = strategy.generate_signals(df).fillna(0)
     prices = df["close"].reset_index(drop=True)
@@ -30,6 +35,8 @@ def run_backtest(
 
     trades = 0
     wins = 0
+    total_fees = 0.0
+    entry_fee = 0.0
 
     trade_rows = []
     equity_rows = [{"index": 0, "equity": equity}]
@@ -42,29 +49,36 @@ def run_backtest(
         if in_position:
             exit_now = False
             exit_reason = ""
-            pnl = 0.0
+            gross_pnl = 0.0
 
             if side == 1:  # long
                 if price <= stop_price:
-                    pnl = units * (price - entry_price)
+                    gross_pnl = units * (price - entry_price)
                     exit_now = True
                     exit_reason = "stop_loss"
                 elif price >= take_profit_price:
-                    pnl = units * (price - entry_price)
+                    gross_pnl = units * (price - entry_price)
                     exit_now = True
                     exit_reason = "take_profit"
             else:  # short
                 if price >= stop_price:
-                    pnl = units * (entry_price - price)
+                    gross_pnl = units * (entry_price - price)
                     exit_now = True
                     exit_reason = "stop_loss"
                 elif price <= take_profit_price:
-                    pnl = units * (entry_price - price)
+                    gross_pnl = units * (entry_price - price)
                     exit_now = True
                     exit_reason = "take_profit"
 
             if exit_now:
+                exit_fill = price * (1 - slippage_rate) if side == 1 else price * (1 + slippage_rate)
+                gross_pnl = units * (exit_fill - entry_price) if side == 1 else units * (entry_price - exit_fill)
+                exit_fee = abs(units * exit_fill) * commission_rate
+                fees = entry_fee + exit_fee
+                pnl = gross_pnl - exit_fee
+
                 equity += pnl
+                total_fees += exit_fee
                 trades += 1
                 if pnl > 0:
                     wins += 1
@@ -75,8 +89,10 @@ def run_backtest(
                         "exit_index": i,
                         "side": "long" if side == 1 else "short",
                         "entry_price": round(entry_price, 6),
-                        "exit_price": round(price, 6),
+                        "exit_price": round(exit_fill, 6),
                         "units": round(units, 6),
+                        "gross_pnl": round(gross_pnl, 6),
+                        "fees": round(fees, 6),
                         "pnl": round(pnl, 6),
                         "exit_reason": exit_reason,
                     }
@@ -85,15 +101,20 @@ def run_backtest(
                 in_position = False
                 side = 0
                 units = 0.0
+                entry_fee = 0.0
 
         # Entry logic (only when flat)
         if not in_position and signal in (1, -1):
             notional = risk_manager.position_notional(equity=equity, entry_price=price)
             if notional > 0:
-                units = notional / price
+                entry_fill = price * (1 + slippage_rate) if signal == 1 else price * (1 - slippage_rate)
+                units = notional / entry_fill
                 side = signal
-                entry_price = price
+                entry_price = entry_fill
                 entry_index = i
+                entry_fee = abs(units * entry_fill) * commission_rate
+                equity -= entry_fee
+                total_fees += entry_fee
                 if side == 1:
                     stop_price = entry_price * (1 - risk_manager.stop_loss_pct)
                     take_profit_price = entry_price * (1 + risk_manager.take_profit_pct)
@@ -120,8 +141,14 @@ def run_backtest(
     # Close open position at final price
     if in_position:
         final_price = float(prices.iloc[-1])
-        pnl = units * (final_price - entry_price) if side == 1 else units * (entry_price - final_price)
+        exit_fill = final_price * (1 - slippage_rate) if side == 1 else final_price * (1 + slippage_rate)
+        gross_pnl = units * (exit_fill - entry_price) if side == 1 else units * (entry_price - exit_fill)
+        exit_fee = abs(units * exit_fill) * commission_rate
+        fees = entry_fee + exit_fee
+        pnl = gross_pnl - exit_fee
+
         equity += pnl
+        total_fees += exit_fee
         trades += 1
         if pnl > 0:
             wins += 1
@@ -132,8 +159,10 @@ def run_backtest(
                 "exit_index": len(prices) - 1,
                 "side": "long" if side == 1 else "short",
                 "entry_price": round(entry_price, 6),
-                "exit_price": round(final_price, 6),
+                "exit_price": round(exit_fill, 6),
                 "units": round(units, 6),
+                "gross_pnl": round(gross_pnl, 6),
+                "fees": round(fees, 6),
                 "pnl": round(pnl, 6),
                 "exit_reason": "end_of_data",
             }
@@ -152,6 +181,9 @@ def run_backtest(
         "risk_per_trade_pct": round(risk_manager.risk_per_trade * 100, 2),
         "stop_loss_pct": round(risk_manager.stop_loss_pct * 100, 2),
         "take_profit_pct": round(risk_manager.take_profit_pct * 100, 2),
+        "commission_bps": round(float(commission_bps), 4),
+        "slippage_bps": round(float(slippage_bps), 4),
+        "fees_paid": round(float(total_fees), 2),
     }
 
     if return_details:

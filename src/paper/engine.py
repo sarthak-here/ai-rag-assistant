@@ -14,6 +14,7 @@ class PaperState:
     entry_price: float = 0.0
     stop_price: float = 0.0
     take_profit_price: float = 0.0
+    entry_fee: float = 0.0
 
 
 def run_paper_loop(
@@ -26,11 +27,18 @@ def run_paper_loop(
     strategy,
     risk_manager: RiskManager,
     initial_balance: float,
+    commission_bps: float = 0.0,
+    slippage_bps: float = 0.0,
 ) -> None:
     state = PaperState(equity=float(initial_balance))
+    commission_rate = max(0.0, float(commission_bps)) / 10_000
+    slippage_rate = max(0.0, float(slippage_bps)) / 10_000
 
     print("=== Paper Trading Started ===")
-    print(f"symbol={symbol} timeframe={timeframe} poll={poll_seconds}s loops={max_loops}")
+    print(
+        f"symbol={symbol} timeframe={timeframe} poll={poll_seconds}s loops={max_loops} "
+        f"commission_bps={commission_bps} slippage_bps={slippage_bps}"
+    )
 
     loop = 0
     while max_loops <= 0 or loop < max_loops:
@@ -39,7 +47,7 @@ def run_paper_loop(
         price = float(df["close"].iloc[-1])
 
         signals = strategy.generate_signals(df).fillna(0)
-        signal = int(signals.iloc[-1])
+        signal = int(signals.iloc[-2]) if len(signals) > 1 else 0  # avoid acting on the still-forming candle
 
         action = "HOLD"
         pnl = 0.0
@@ -47,17 +55,25 @@ def run_paper_loop(
         if state.in_position:
             if state.side == 1:
                 if price <= state.stop_price:
-                    pnl = state.units * (price - state.entry_price)
+                    exit_fill = price * (1 - slippage_rate)
+                    pnl = state.units * (exit_fill - state.entry_price)
+                    pnl -= abs(state.units * exit_fill) * commission_rate
                     action = "EXIT_LONG_SL"
                 elif price >= state.take_profit_price:
-                    pnl = state.units * (price - state.entry_price)
+                    exit_fill = price * (1 - slippage_rate)
+                    pnl = state.units * (exit_fill - state.entry_price)
+                    pnl -= abs(state.units * exit_fill) * commission_rate
                     action = "EXIT_LONG_TP"
             elif state.side == -1:
                 if price >= state.stop_price:
-                    pnl = state.units * (state.entry_price - price)
+                    exit_fill = price * (1 + slippage_rate)
+                    pnl = state.units * (state.entry_price - exit_fill)
+                    pnl -= abs(state.units * exit_fill) * commission_rate
                     action = "EXIT_SHORT_SL"
                 elif price <= state.take_profit_price:
-                    pnl = state.units * (state.entry_price - price)
+                    exit_fill = price * (1 + slippage_rate)
+                    pnl = state.units * (state.entry_price - exit_fill)
+                    pnl -= abs(state.units * exit_fill) * commission_rate
                     action = "EXIT_SHORT_TP"
 
             if action.startswith("EXIT"):
@@ -65,20 +81,24 @@ def run_paper_loop(
                 state.in_position = False
                 state.side = 0
                 state.units = 0.0
+                state.entry_fee = 0.0
 
         if not state.in_position and signal in (1, -1):
             notional = risk_manager.position_notional(equity=state.equity, entry_price=price)
             if notional > 0:
-                state.units = notional / price
+                entry_fill = price * (1 + slippage_rate) if signal == 1 else price * (1 - slippage_rate)
+                state.units = notional / entry_fill
                 state.side = signal
-                state.entry_price = price
+                state.entry_price = entry_fill
+                state.entry_fee = abs(state.units * entry_fill) * commission_rate
+                state.equity -= state.entry_fee
                 if state.side == 1:
-                    state.stop_price = price * (1 - risk_manager.stop_loss_pct)
-                    state.take_profit_price = price * (1 + risk_manager.take_profit_pct)
+                    state.stop_price = entry_fill * (1 - risk_manager.stop_loss_pct)
+                    state.take_profit_price = entry_fill * (1 + risk_manager.take_profit_pct)
                     action = "ENTER_LONG"
                 else:
-                    state.stop_price = price * (1 + risk_manager.stop_loss_pct)
-                    state.take_profit_price = price * (1 - risk_manager.take_profit_pct)
+                    state.stop_price = entry_fill * (1 + risk_manager.stop_loss_pct)
+                    state.take_profit_price = entry_fill * (1 - risk_manager.take_profit_pct)
                     action = "ENTER_SHORT"
                 state.in_position = True
 
