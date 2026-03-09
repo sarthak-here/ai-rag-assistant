@@ -17,6 +17,19 @@ class AskRequest(BaseModel):
     k: int = Field(default=3, ge=1, le=10)
 
 
+class SourceItem(BaseModel):
+    text: str
+    score: float
+    source: str
+    chunk_id: int
+
+
+class AskResponse(BaseModel):
+    question: str
+    answer: str
+    sources: list[SourceItem]
+
+
 def _verify_token(auth_header: str | None) -> None:
     if not settings.api_token:
         return
@@ -30,7 +43,7 @@ def health():
     return {"ok": True, "index_path": settings.index_path}
 
 
-@app.post("/ask")
+@app.post("/ask", response_model=AskResponse)
 def ask(
     req: AskRequest,
     request: Request,
