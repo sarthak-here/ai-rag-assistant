@@ -28,6 +28,8 @@ Create a `data/` folder and put files such as:
 - `data/faq.md`
 - `data/product_notes.txt`
 
+(You can copy starter content from `data.sample/`.)
+
 ### 2) Build index
 ```bash
 python ingest.py --source data --out index.json
@@ -52,6 +54,7 @@ curl -X POST "http://127.0.0.1:8000/ask" \
 ```bash
 make install
 make test
+python eval.py
 ```
 
 ## Notes for public release
