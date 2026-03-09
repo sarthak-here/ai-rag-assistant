@@ -1,5 +1,7 @@
 # 01 — RAG Assistant
 
+[![CI](https://github.com/sarthak-here/ai-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/sarthak-here/ai-rag-assistant/actions/workflows/ci.yml)
+
 A lightweight Retrieval-Augmented Generation (RAG) starter project.
 
 ## Features
@@ -46,7 +48,13 @@ curl -X POST "http://127.0.0.1:8000/ask" \
 ## Environment
 - `RAG_INDEX_PATH` (default: `index.json`)
 
+## Development
+```bash
+make install
+make test
+```
+
 ## Notes for public release
-- Add LICENSE (MIT/Apache-2.0)
-- Add CI checks and tests
 - Add sample dataset + benchmark script
+- Add optional semantic embedding backend (FAISS/Chroma)
+- Add auth/rate-limits for hosted deployments
