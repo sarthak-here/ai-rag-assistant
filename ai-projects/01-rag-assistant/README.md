@@ -33,6 +33,8 @@ Create a `data/` folder and put files such as:
 ### 2) Build index
 ```bash
 python ingest.py --source data --out index.json
+# or bootstrap from sample docs (PowerShell)
+./scripts/bootstrap.ps1
 ```
 
 ### 3) Run API
