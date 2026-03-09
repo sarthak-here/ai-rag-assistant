@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from config import settings
+from rate_limit import InMemoryRateLimiter
 from retriever import retrieve_top_k
 
 
 app = FastAPI(title="RAG Assistant", version="0.3.0")
+rate_limiter = InMemoryRateLimiter(settings.rate_limit_per_minute)
 
 
 class AskRequest(BaseModel):
@@ -29,8 +31,17 @@ def health():
 
 
 @app.post("/ask")
-def ask(req: AskRequest, authorization: str | None = Header(default=None)):
+def ask(
+    req: AskRequest,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_forwarded_for: str | None = Header(default=None),
+):
     _verify_token(authorization)
+    client_key = x_forwarded_for or (request.client.host if request.client else "unknown")
+    if not rate_limiter.allow(client_key):
+        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+
     chunks = retrieve_top_k(req.question, k=req.k, index_path=settings.index_path)
     sources = [
         {
