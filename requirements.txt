@@ -1,4 +1,0 @@
-pandas==2.2.3
-numpy==2.2.4
-python-dotenv==1.0.1
-yfinance==0.2.54
