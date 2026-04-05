@@ -1,70 +1,65 @@
-# Gold Trading Bot (XAUUSD)
+# 01 — RAG Assistant
 
-A starter Python project for building, backtesting, and running a gold trading bot.
+[![CI](https://github.com/sarthak-here/ai-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/sarthak-here/ai-rag-assistant/actions/workflows/ci.yml)
 
-## Scope (v0)
-- Data ingestion (historical + live placeholders)
-- Strategy interface + sample MA crossover strategy
-- Risk manager (position sizing + SL/TP)
-- Paper trading executor
-- Simple backtest runner
+A lightweight Retrieval-Augmented Generation (RAG) starter project.
 
-## Quick start
+## Features
+- FastAPI service with `/ask` and `/health`
+- Local ingestion from `data/` (`.txt`, `.md`, `.rst`)
+- Small BM25-like retriever (no vector DB required)
+- JSON index output (`index.json`)
+
+## Project Structure
+- `ingest.py` — build index from local documents
+- `retriever.py` — indexing + retrieval logic
+- `api.py` — FastAPI inference endpoint
+- `requirements.txt` — dependencies
+
+## Quickstart
 ```bash
 python -m venv .venv
-.venv\Scripts\activate
+. .venv/Scripts/activate   # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-python -m src.main --mode backtest --source yfinance --save-report
 ```
 
-## Paper trading loop
+### 1) Add source docs
+Create a `data/` folder and put files such as:
+- `data/faq.md`
+- `data/product_notes.txt`
+
+(You can copy starter content from `data.sample/`.)
+
+### 2) Build index
 ```bash
-python -m src.main --mode paper
+python ingest.py --source data --out index.json
+# or bootstrap from sample docs (PowerShell)
+./scripts/bootstrap.ps1
 ```
-This runs a live paper loop using yfinance prices and your risk settings.
 
-## Next milestones
-1. Connect broker/data provider
-2. Add robust position sizing + SL/TP rules
-3. Add live paper-trading loop
-4. Add tests for strategy and risk modules
-
-## Risk settings (.env)
-- `RISK_PER_TRADE` (e.g. 0.01 = 1% equity risk per trade)
-- `STOP_LOSS_PCT` (e.g. 0.01 = 1% stop)
-- `TAKE_PROFIT_PCT` (e.g. 0.02 = 2% target)
-- `MAX_POSITION_NOTIONAL_PCT` (cap exposure, 1.0 = 100% equity)
-- `COMMISSION_BPS` (transaction fee in bps, e.g. 1.0 = 0.01%)
-- `SLIPPAGE_BPS` (fill slippage in bps, e.g. 2.0 = 0.02%)
-
-## Reporting output
-Run with `--save-report` to generate files under `reports/backtest-<timestamp>/`:
-- `summary.json` (performance metrics)
-- `equity_curve.csv` (index-wise equity)
-- `trades.csv` (trade log with entry/exit/pnl)
-
-## Streamlit Forecast Dashboard (New)
-A visual interface is included for future price prediction and charting.
-
-### Files
-- `streamlit_app.py` — Streamlit UI for historical + forecast visualization
-- `requirements-streamlit.txt` — dependencies for the dashboard
-
-### Run dashboard
+### 3) Run API
 ```bash
-pip install -r requirements-streamlit.txt
-streamlit run streamlit_app.py
+uvicorn api:app --reload --port 8000
 ```
 
-### Gold usage
-- Ticker mode defaults to `GC=F` (Gold Futures)
-- You can also upload your own gold price CSV (date + price columns)
+### 4) Ask
+```bash
+curl -X POST "http://127.0.0.1:8000/ask" \
+  -H "Content-Type: application/json" \
+  -d '{"question":"What is this assistant for?","k":3}'
+```
 
-Dashboard features:
-- Historical price chart
-- Future price forecast with confidence band
-- Backtest metrics (MAE/RMSE)
-- Forecast table + CSV download
+## Environment
+- `RAG_INDEX_PATH` (default: `index.json`)
 
-## Disclaimer
-This code is for education/research. Trading is risky. Use paper trading first.
+## Development
+```bash
+make install
+make test
+python eval.py
+```
+
+## Notes for public release
+- Add sample dataset + benchmark script
+- Add optional semantic embedding backend (FAISS/Chroma)
+- Add auth/rate-limits for hosted deployments
