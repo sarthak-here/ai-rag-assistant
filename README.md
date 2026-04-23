@@ -1,5 +1,10 @@
 # 01 — RAG Assistant
 
+> **[System Design](./systemdesign.md)** - Architecture, data flow, and how it works end-to-end
+
+---
+
+
 [![CI](https://github.com/sarthak-here/ai-rag-assistant/actions/workflows/ci.yml/badge.svg)](https://github.com/sarthak-here/ai-rag-assistant/actions/workflows/ci.yml)
 
 A lightweight Retrieval-Augmented Generation (RAG) starter project.
